@@ -43,5 +43,4 @@ schema.pre("save", async function (next) {
   this.password = await hash(this.password, 10);
 });
 
-
 export const User = mongoose.models.User || model("User", schema);

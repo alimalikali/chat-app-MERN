@@ -1,19 +1,14 @@
-import  jwt  from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { TryCatch } from "../middlewares/error.js";
 import { Chat } from "../models/chat.js";
 import { Message } from "../models/message.js";
 import { User } from "../models/user.js";
 import { ErrorHandler } from "../utils/utility.js";
 import { cookieOptions } from "../utils/features.js";
+import { adminSecretKey } from "../app.js";
 
-export const getAdminData = TryCatch(async (req, res, next) => {
-  return res.status(200).json({
-    admin: true,
-  });
-});
-export const adminLogin = TryCatch(async (req, res, next) => {
+const adminLogin = TryCatch(async (req, res, next) => {
   const { secretKey } = req.body;
-  const adminSecretKey = process.env.ADMIN_SECRET_KEY;
 
   const isMatched = secretKey === adminSecretKey;
 
@@ -32,8 +27,8 @@ export const adminLogin = TryCatch(async (req, res, next) => {
       message: "Authenticated Successfully, Welcome BOSS",
     });
 });
-export const adminLogout = TryCatch(async (req, res, next) => {
 
+const adminLogout = TryCatch(async (req, res, next) => {
   return res
     .status(200)
     .cookie("chattu-admin-token", "", {
@@ -42,10 +37,17 @@ export const adminLogout = TryCatch(async (req, res, next) => {
     })
     .json({
       success: true,
-      message: "Logout Successfully, ByBy BOSS",
+      message: "Logged Out Successfully",
     });
 });
-export const allUsers = TryCatch(async (req, res) => {
+
+const getAdminData = TryCatch(async (req, res, next) => {
+  return res.status(200).json({
+    admin: true,
+  });
+});
+
+const allUsers = TryCatch(async (req, res) => {
   const users = await User.find({});
 
   const transformedUsers = await Promise.all(
@@ -71,7 +73,8 @@ export const allUsers = TryCatch(async (req, res) => {
     users: transformedUsers,
   });
 });
-export const allChats = TryCatch(async (req, res) => {
+
+const allChats = TryCatch(async (req, res) => {
   const chats = await Chat.find({})
     .populate("members", "name avatar")
     .populate("creator", "name avatar");
@@ -102,10 +105,11 @@ export const allChats = TryCatch(async (req, res) => {
 
   return res.status(200).json({
     status: "success",
-    users: transformedChats,
+    chats: transformedChats,
   });
 });
-export const allMessages = TryCatch(async (req, res) => {
+
+const allMessages = TryCatch(async (req, res) => {
   const messages = await Message.find({})
     .populate("sender", "name avatar")
     .populate("chat", "groupChat");
@@ -125,14 +129,14 @@ export const allMessages = TryCatch(async (req, res) => {
       },
     })
   );
-  console.log(content, attachments, _id, sender, createdAt, chat, "sas");
 
   return res.status(200).json({
     success: true,
     messages: transformedMessages,
   });
 });
-export const getDashboardStats = TryCatch(async (req, res) => {
+
+const getDashboardStats = TryCatch(async (req, res) => {
   const [groupsCount, usersCount, messagesCount, totalChatsCount] =
     await Promise.all([
       Chat.countDocuments({ groupChat: true }),
@@ -145,6 +149,7 @@ export const getDashboardStats = TryCatch(async (req, res) => {
 
   const last7Days = new Date();
   last7Days.setDate(last7Days.getDate() - 7);
+
   const last7DaysMessages = await Message.find({
     createdAt: {
       $gte: last7Days,
@@ -162,6 +167,7 @@ export const getDashboardStats = TryCatch(async (req, res) => {
 
     messages[6 - index]++;
   });
+
   const stats = {
     groupsCount,
     usersCount,
@@ -175,3 +181,13 @@ export const getDashboardStats = TryCatch(async (req, res) => {
     stats,
   });
 });
+
+export {
+  allUsers,
+  allChats,
+  allMessages,
+  getDashboardStats,
+  adminLogin,
+  adminLogout,
+  getAdminData,
+};

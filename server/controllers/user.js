@@ -1,23 +1,33 @@
 import { compare } from "bcrypt";
-import { User } from "../models/user.js";
+import { NEW_REQUEST, REFETCH_CHATS } from "../constants/events.js";
+import { getOtherMember } from "../lib/helper.js";
+import { TryCatch } from "../middlewares/error.js";
 import { Chat } from "../models/chat.js";
 import { Request } from "../models/request.js";
-import { NEW_REQUEST, REFETCH_CHATS } from "../constants/events.js";
-import { cookieOptions, emitEvent, sendToken } from "../utils/features.js";
-import { TryCatch } from "../middlewares/error.js";
+import { User } from "../models/user.js";
+import {
+  cookieOptions,
+  emitEvent,
+  sendToken,
+  uploadFilesToCloudinary,
+} from "../utils/features.js";
 import { ErrorHandler } from "../utils/utility.js";
-import { getOtherMember } from "../lib/helper.js";
 
-export const newUser = TryCatch(async (req, res, next) => {
-  const { name, bio, username, password } = req.body;
+// Create a new user and save it to the database and save token in cookie
+const newUser = TryCatch(async (req, res, next) => {
+  const { name, username, password, bio } = req.body;
+
   const file = req.file;
+
   if (!file) return next(new ErrorHandler("Please Upload Avatar"));
+
+  const result = await uploadFilesToCloudinary([file]);
+
   const avatar = {
-    public_id: "212",
-    url: "212",
+    public_id: result[0].public_id,
+    url: result[0].url,
   };
 
-  // Create a new user
   const user = await User.create({
     name,
     bio,
@@ -26,10 +36,11 @@ export const newUser = TryCatch(async (req, res, next) => {
     avatar,
   });
 
-  // Respond with success message
-  sendToken(res, user, 201, "user created");
+  sendToken(res, user, 201, "User created");
 });
-export const login = TryCatch(async (req, res, next) => {
+
+// Login user and save token in cookie
+const login = TryCatch(async (req, res, next) => {
   const { username, password } = req.body;
 
   const user = await User.findOne({ username }).select("+password");
@@ -43,28 +54,35 @@ export const login = TryCatch(async (req, res, next) => {
 
   sendToken(res, user, 200, `Welcome Back, ${user.name}`);
 });
-export const getMyProfile = TryCatch(async (req, res) => {
+
+const getMyProfile = TryCatch(async (req, res, next) => {
   const user = await User.findById(req.user);
 
   if (!user) return next(new ErrorHandler("User not found", 404));
-  return res.status(200).json({
+
+  res.status(200).json({
     success: true,
-    user: user.username, // Assuming req.user contains user data
+    user,
   });
 });
-export const logout = TryCatch(async (req, res, next) => {
+
+const logout = TryCatch(async (req, res) => {
   return res
     .status(200)
-    .cookie("chattu-token", {}, { ...cookieOptions, maxAge: 0 })
+    .cookie("chattu-token", "", { ...cookieOptions, maxAge: 0 })
     .json({
       success: true,
-      message: "logout successfully",
+      message: "Logged out successfully",
     });
 });
-export const searchUser = TryCatch(async (req, res, next) => {
-  const { name } = req.query;
+
+const searchUser = TryCatch(async (req, res) => {
+  const { name = "" } = req.query;
+
+  // Finding All my chats
   const myChats = await Chat.find({ groupChat: false, members: req.user });
 
+  //  extracting All Users from my chats means friends or people I have chatted with
   const allUsersFromMyChats = myChats.flatMap((chat) => chat.members);
 
   // Finding all users except me and my friends
@@ -73,6 +91,7 @@ export const searchUser = TryCatch(async (req, res, next) => {
     name: { $regex: name, $options: "i" },
   });
 
+  // Modifying the response
   const users = allUsersExceptMeAndFriends.map(({ _id, name, avatar }) => ({
     _id,
     name,
@@ -81,12 +100,12 @@ export const searchUser = TryCatch(async (req, res, next) => {
 
   return res.status(200).json({
     success: true,
-    users, // Assuming req.user contains user data
+    users,
   });
 });
-export const sendFriendRequest = TryCatch(async (req, res, next) => {
+
+const sendFriendRequest = TryCatch(async (req, res, next) => {
   const { userId } = req.body;
-  console.log(req.user);
 
   const request = await Request.findOne({
     $or: [
@@ -109,12 +128,14 @@ export const sendFriendRequest = TryCatch(async (req, res, next) => {
     message: "Friend Request Sent",
   });
 });
-export const acceptFriendRequest = TryCatch(async (req, res, next) => {
+
+const acceptFriendRequest = TryCatch(async (req, res, next) => {
   const { requestId, accept } = req.body;
 
   const request = await Request.findById(requestId)
     .populate("sender", "name")
     .populate("receiver", "name");
+
   if (!request) return next(new ErrorHandler("Request not found", 404));
 
   if (request.receiver._id.toString() !== req.user.toString())
@@ -149,11 +170,13 @@ export const acceptFriendRequest = TryCatch(async (req, res, next) => {
     senderId: request.sender._id,
   });
 });
-export const getMyNotifications = TryCatch(async (req, res) => {
+
+const getMyNotifications = TryCatch(async (req, res) => {
   const requests = await Request.find({ receiver: req.user }).populate(
     "sender",
     "name avatar"
   );
+
   const allRequests = requests.map(({ _id, sender }) => ({
     _id,
     sender: {
@@ -162,12 +185,14 @@ export const getMyNotifications = TryCatch(async (req, res) => {
       avatar: sender.avatar.url,
     },
   }));
+
   return res.status(200).json({
     success: true,
     allRequests,
   });
 });
-export const getMyFriends = TryCatch(async (req, res) => {
+
+const getMyFriends = TryCatch(async (req, res) => {
   const chatId = req.query.chatId;
 
   const chats = await Chat.find({
@@ -203,3 +228,15 @@ export const getMyFriends = TryCatch(async (req, res) => {
     });
   }
 });
+
+export {
+  acceptFriendRequest,
+  getMyFriends,
+  getMyNotifications,
+  getMyProfile,
+  login,
+  logout,
+  newUser,
+  searchUser,
+  sendFriendRequest,
+};
