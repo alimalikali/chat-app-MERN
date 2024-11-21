@@ -146,6 +146,12 @@ io.on("connection", (socket) => {
 
 app.use(errorMiddleware);
 
-export default server; 
+server.listen(port, () => {
+  console.log(`Server is running on port ${port} in ${envMode} Mode`);
+});
+
+
 
 export { envMode, adminSecretKey, userSocketIDs };
+
+export default server;
