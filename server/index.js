@@ -36,7 +36,14 @@ const adminSecretKey = process.env.ADMIN_SECRET_KEY || "adsasdsdfsdfsdfd";
 const userSocketIDs = new Map();
 const onlineUsers = new Set();
 
-connectDB(mongoURI);
+if (envMode === "DEVELOPMENT" && !mongoURI) {
+  import('./test-setup.js').then(async ({ startTestDB }) => {
+    const uri = await startTestDB();
+    connectDB(uri);
+  });
+} else {
+  connectDB(mongoURI);
+}
 
 
 cloudinary.config({

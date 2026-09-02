@@ -37,6 +37,13 @@ const emitEvent = (req, event, users, data) => {
 };
 
 const uploadFilesToCloudinary = async (files = []) => {
+  if (process.env.NODE_ENV === "DEVELOPMENT" && (!process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME === "")) {
+    return files.map(() => ({
+      public_id: uuid(),
+      url: "https://via.placeholder.com/150",
+    }));
+  }
+
   const uploadPromises = files.map((file) => {
     return new Promise((resolve, reject) => {
       cloudinary.uploader.upload(
