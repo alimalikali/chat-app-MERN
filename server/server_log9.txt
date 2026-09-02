@@ -1,0 +1,8 @@
+
+> server@1.0.0 start
+> node index.js
+
+Server is running on port 5000 in DEVELOPMENT Mode
+Memory DB Started at:  mongodb://127.0.0.1:34645/
+Connected to DB: 127.0.0.1
+Terminated
